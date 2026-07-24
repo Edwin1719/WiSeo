@@ -1,0 +1,21 @@
+# ============================================================
+# SEO Agent — Dependencias
+# Python requerido: >=3.11 (por pandas 3.0)
+# Recomendado: 3.12
+# Instalar: pip install -r requirements.txt
+# ============================================================
+
+# --- Core ---
+streamlit>=1.42.0,<2
+mcp>=1.6.0,<2           # v2 en alpha, mantenemos v1 estable
+python-dotenv>=1.0.0
+
+# --- LLM (DeepSeek usa API compatible con OpenAI) ---
+openai>=1.70.0
+
+# --- Datos y visualizacion ---
+pandas>=2.2.0            # >=3.0 requiere Python >=3.11
+plotly>=5.24.0
+
+# --- HTTP (MCP Streamable HTTP transport) ---
+httpx>=0.28.0,<1
