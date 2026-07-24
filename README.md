@@ -1,4 +1,6 @@
-# 🔍 SEO Agent
+# 🔍 Wiseo
+
+**by Edwin Quintero Alzate — DATABiQ**
 
 **Agente virtual de SEO inteligente** — consulta en lenguaje natural y obtén análisis profesionales de cualquier sitio web: estructura on-page, velocidad, Core Web Vitals, sitemaps, competidores y más. Sin depender de Semrush, Ahrefs ni suscripciones costosas.
 

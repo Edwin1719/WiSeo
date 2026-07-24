@@ -56,7 +56,7 @@ def _get_loop() -> asyncio.AbstractEventLoop:
 # ============================================================
 
 st.set_page_config(
-    page_title="SEO Agent",
+    page_title="Wiseo",
     page_icon="🔍",
     layout="wide",
     initial_sidebar_state="expanded",
@@ -424,7 +424,7 @@ def _render_sidebar() -> None:
                 font-size:20px;color:white;font-weight:bold;
             '>S</div>
             <div>
-                <div style='font-weight:700;font-size:1.1rem;line-height:1.2'>SEO Agent</div>
+                <div style='font-weight:700;font-size:1.1rem;line-height:1.2'>Wiseo</div>
                 <div style='font-size:0.7rem;color:#888;'>v0.3 &middot; DeepSeek + Wigolo</div>
             </div>
         </div>
@@ -477,7 +477,7 @@ def _render_sidebar() -> None:
         with st.expander("ℹ️  Acerca de"):
             st.markdown(f"""
             <div style='font-size:0.8rem;line-height:1.6'>
-                <b>SEO Agent</b> — v0.3<br>
+                <b>Wiseo</b> — v0.3<br>
                 Agente virtual SEO con lenguaje natural.<br><br>
                 <b>Stack:</b>
                 <ul style='margin:0;padding-left:16px'>
@@ -582,7 +582,7 @@ def main() -> None:
 
     _render_sidebar()
 
-    st.title("🔍 SEO Agent")
+    st.title("🔍 Wiseo")
     st.caption(
         "Tu agente virtual de SEO — potenciado por DeepSeek, Wigolo y OpenSEO"
     )
