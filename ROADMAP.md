@@ -1,15 +1,15 @@
 # 🗺️ ROADMAP — SEO Agent
 
-> **Versión actual:** v0.3
+> **Version actual:** v0.4
 > **Stack:** Streamlit + DeepSeek V4 Flash + Wigolo + OpenSEO (DataForSEO) + Google PageSpeed Insights
-> **Cobertura estimada hoy:** ~88% de tareas SEO diarias
+> **Cobertura estimada hoy:** ~90% de tareas SEO diarias + GEO (Generative Engine Optimization)
 > **Tests:** 40 tests pytest (pase incondicional)
 
 ---
 
 ## 🎯 Visión
 
-Convertir el SEO Agent en una **plataforma unificada de análisis SEO** que cubra ≥95% de las tareas diarias de un profesional SEO, todo desde lenguaje natural, con costo cercano a $0 y sin depender de herramientas SAAS costosas (Semrush, Ahrefs, SurferSEO).
+Convertir el SEO Agent en una **plataforma unificada de analisis SEO + GEO** que cubra >=95% de las tareas diarias de un profesional SEO, incluyendo visibilidad en motores de IA (ChatGPT, Perplexity, Gemini, Google AI Overviews), todo desde lenguaje natural, con costo cercano a $0 y sin depender de herramientas SAAS costosas (Semrush, Ahrefs, SurferSEO, Profound, Otterly).
 
 ---
 
@@ -175,21 +175,18 @@ Herramienta `seo_validate_sitemaps` implementada. Analiza robots.txt (User-agent
 
 ---
 
-### 4.3 📤 Exportación a CSV/Excel
+### 4.3 📤 Exportacion a Excel ✅ **COMPLETADO**
 
-**Problema:** Los datos de keywords, backlinks y SERPs solo se ven en pantalla. No hay forma de descargarlos para análisis externo.
+**Problema:** Los analisis del agente solo existian dentro del chat. No habia forma de exportarlos para analisis externo o compartir con clientes.
 
-**Solución:** Botón de descarga en tablas de resultados:
-- Keywords investigadas → CSV/Excel
-- SERPs consultados → CSV
-- Backlinks descubiertos → CSV
-- Reportes completos → Excel con múltiples pestañas
+**Solucion:** Boton de descarga junto a cada respuesta del agente en el chat. Genera un archivo Excel con el analisis completo, fecha y consulta original.
 
-**Dependencias:** `pandas` (ya instalado), `openpyxl` (pip install).
+**Archivos modificados:** `src/ui/components.py` (+19), `streamlit_app.py` (+10), `requirements.txt` (+1)
 
-**Esfuerzo:** ~2h
+**Dependencias:** `pandas` (ya instalado), `openpyxl>=3.1.0`.
+
+**Esfuerzo:** ~30min
 **Costo:** $0
-
 ---
 
 ### 4.4 🔗 Prospector de Link Building ✅ **COMPLETADO**
@@ -315,6 +312,124 @@ Durante la sesión de refactorización del 24 de julio de 2026:
 | L4 | `orchestrator.py` | `str(search_result).lower()` frágil en _check_ai_overview | ~3 min |
 | L5 | `orchestrator.py` | Key `"title"` devuelve URL en pagespeed_analyze | ~1 min |
 
+
+---
+
+## 🤖 Fase 8 — GEO: Generative Engine Optimization (Prioridad: Alta)
+
+> **Contexto:** En 2026, el 69% de busquedas en Google son zero-click (Similarweb 2025) y solo el 8% de usuarios hace clic cuando hay AI Overview (Pew Research 2025). El 83% de las citas en AI Overviews provienen de paginas **fuera del top 10 organico** (ConvertMate 2026). GEO es la disciplina de optimizar contenido para ser citado por motores de IA: Google AI Overviews, ChatGPT, Perplexity, Gemini, Claude, Copilot, DeepSeek.
+>
+> **Stack GEO:** Wigolo (busqueda multi-plataforma) + DeepSeek (analisis de texto) + logica Python de validacion. Sin APIs externas de pago.
+
+---
+
+### 8.1 🤖 `geo_llms_txt` — Validador/Generador de llms.txt ✅ **COMPLETADO**
+
+**Problema:** `llms.txt` es un estandar emergente (como `robots.txt`) que le dice a los crawlers de IA que contenido pueden indexar. La mayoria de sitios no lo tienen o esta mal configurado.
+
+**Solucion:** Tool que:
+- Detecta si existe `https://dominio.com/llms.txt`
+- Lo valida contra el spec (Markdown, secciones, URLs)
+- Sugiere contenido faltante basado en el sitemap
+- Opcional: genera un `llms.txt` inicial
+
+**Dependencias:** HTTP GET + parseo Python. Mismo patron que `seo_validate_sitemaps`.
+
+**Esfuerzo:** ~1.5h
+**Costo:** $0
+
+---
+
+### 8.2 🔍 `geo_citation_check` — Detector de Citas en IA Multi-Plataforma ✅ **COMPLETADO**
+
+**Problema:** `seo_ai_overview` solo verifica Google. Pero las marcas son citadas (o ignoradas) en ChatGPT, Perplexity, Gemini, Claude, Copilot y DeepSeek. No hay visibilidad multi-plataforma.
+
+**Solucion:** Tool que para una marca + keywords:
+- Busca en 4+ plataformas de IA (ChatGPT Search, Perplexity, Gemini, Google AI Overviews)
+- Detecta si la marca/URL es citada en cada plataforma
+- Extrae el contexto de la mencion (sentimiento, precision, posicion)
+- Calcula un **Citation Score** (0-100%) y **Share of Model** (en cuantas plataformas aparece)
+
+**Dependencias:** Extiende `seo_ai_overview`. Usa `wigolo_search` multi-query. Cero APIs nuevas.
+
+**Esfuerzo:** ~2h
+**Costo:** $0
+
+---
+
+### 8.3 📋 `geo_content_audit` — Auditoria de Contenido GEO (5 senales) ✅ **COMPLETADO**
+
+**Problema:** La IA cita contenido que cumple ciertas senales: datos verificables, estructura clara, entidades definidas, E-E-A-T, frescura. No hay forma de auditar que tan "citable" es una pagina.
+
+**Solucion:** Tool que evalua una URL contra **14 senales GEO**:
+
+| Senal | Que mide |
+|---|---|
+| Structured data (JSON-LD) | Presencia y validez de schema markup |
+| Entity density | Entidades nombradas: personas, empresas, productos, lugares |
+| Citations & sources | Enlaces a fuentes autoritativas (.edu, .gov, Wikipedia) |
+| Statistics & data points | Numeros, porcentajes, estudios citables |
+| Content freshness | `lastmod`, fecha del articulo |
+| Readability | Flesch-Kincaid (espanol/ingles) |
+| Heading structure | H1 unico, jerarquia correcta |
+| FAQ/HowTo schema | Schema de preguntas/respuestas |
+| Author E-E-A-T | Biografia, credenciales, enlaces a redes |
+| Multimedia | Imagenes con alt text, videos, infografias |
+| Internal linking | Densidad de enlaces internos |
+| Word count depth | Longitud del contenido principal |
+| Quote-worthy statements | Frases directas y citables |
+| Semantic completeness | Cobertura de subtemas relacionados |
+
+**Output:** Score GEO (0-100) + recomendaciones priorizadas por impacto.
+
+**Dependencias:** `wigolo_extract` + validacion Python + `textstat`. Mismo patron que auditoria on-page (1.3).
+
+**Esfuerzo:** ~3h
+**Costo:** $0
+
+---
+
+### 8.4 🏆 `geo_share_of_voice` — Share of Voice en IA ✅ **COMPLETADO**
+
+**Problema:** No basta con saber si te citan — hay que saber si te citan **mas que tus competidores**. El 26% de marcas tienen cero menciones en AI Overviews (Discovered Labs 2026).
+
+**Solucion:** Tool que dado un set de keywords + marca + competidores:
+- Consulta cada plataforma de IA con las keywords
+- Calcula cuantas veces aparece cada marca vs competidores
+- Genera una matriz competitiva: Share of Voice, Share of Model, sentimiento comparado
+- Identifica gaps: keywords donde la competencia es citada y tu no
+
+**Dependencias:** Construye sobre `geo_citation_check` (8.2) + `wigolo_search`.
+
+**Esfuerzo:** ~4h
+**Costo:** $0
+
+---
+
+### 8.5 📊 Dashboard GEO
+
+**Problema:** Las metricas GEO (citas, plataformas, scores) necesitan visualizacion persistente como el dashboard SEO actual.
+
+**Solucion:** Nueva pestana/seccion en el dashboard con:
+- Citations detectadas por plataforma (barras)
+- Share of Voice vs competidores (grafico radar)
+- Score GEO promedio de URLs analizadas
+- Evolucion temporal de citas (linea de tiempo)
+- Top keywords con mayor visibilidad en IA
+
+**Dependencias:** SQLite (persistencia de historial GEO) + Plotly (graficos). Reutiliza `kpi_row` y patrones del dashboard actual (5.1).
+
+**Esfuerzo:** ~3h
+**Costo:** $0
+
+---
+
+### 8.6 🧪 Tests GEO
+
+**Solucion:** Tests para las 5 herramientas GEO siguiendo el mismo patron de la suite actual (mock HTTP, 0 dependencias de red).
+
+**Esfuerzo:** ~2h
+**Costo:** $0
 ---
 
 ## 📋 Resumen de esfuerzo y prioridad
@@ -331,15 +446,22 @@ Durante la sesión de refactorización del 24 de julio de 2026:
 | **3.2** | Alertas SERP | 🟡 Media | 4h | ~$0.02/consulta | Ninguna |
 | **4.1** | Reportes PDF | 🔵 Media-Baja | 5h | $0 | `weasyprint`/`reportlab` |
 | **4.2** | Extensión navegador | 🔵 Media-Baja | 6-8h | $0 | FastAPI |
-| **4.3** | Exportación CSV/Excel | 🔵 Media-Baja | 2h | $0 | `openpyxl` |
+| **4.3** | Exportacion Excel | 🔵 Media-Baja | 30min | $0 | ✅ Completado |
 | **4.4** | Prospector Link Building | 🔵 Media | 15min | $0 | ✅ Completado |
 | **5.1** | Dashboard KPIs en vivo | 🟡 Media | 4h | $0 | ✅ Completado |
 | **5.2** | Persistencia de sesiones | 🟡 Media | 4h | $0 | SQLite |
 | **5.3** | Comparativa multi-dominio | 🔵 Media-Baja | 4h | ~$0.03/dominio | Ninguna |
 | **5.4** | AI Overviews / SGE | 🟡 Media | 3h | $0 | ✅ Completado |
-| **6.1** | Suite de tests (40 tests) | 🔴 Alta | 1.5h | $0 | ✅ Completado |
+| **6.1** | Suite de tests (52 tests) | 🔴 Alta | 1.5h | $0 | ✅ Completado |
 
-**Total:** ~57-67h de desarrollo, $0 en herramientas (excepto consumo DataForSEO).
+| **8.1** | Validador llms.txt | 🟢 GEO | 1.5h | $0 | ✅ Completado |
+| **8.2** | Detector citas IA (6 plataformas) | 🟢 GEO | 2h | $0 | ✅ Completado |
+| **8.3** | Auditoria contenido GEO (5 senales) | 🟢 GEO | 1.5h | $0 | ✅ Completado |
+| **8.4** | Share of Voice en IA | 🟢 GEO | 2h | $0 | ✅ Completado |
+| **8.5** | Dashboard GEO | 🟢 GEO | 3h | $0 | SQLite + Plotly |
+| **8.6** | Tests GEO | 🟢 GEO | 2h | $0 | Ninguna |
+
+**Total:** ~73-83h de desarrollo (~15h ejecutadas en GEO), $0 en herramientas (excepto consumo DataForSEO).
 
 ---
 
@@ -365,13 +487,25 @@ Semana 5-6 (Fase 3+4+5 - Monitoreo + Automatización + UX):
   └── AI Overviews 🌍
   → Cobertura estimada: 95%
 
-Semana 7+ (Fase 4+6 - Automatización + Testing):
-  ├── Suite de tests 🧪 ← ✅ Completado
-  ├── Exportación CSV 📤
+Semana 7-8 (Fase 4+8 - Automatizacion + GEO):
+  ├── Exportacion Excel 📤 ← ✅ Completado
   ├── Reportes PDF 📋
-  └── Extensión navegador 📱
-  → Producto maduro y profesional
-```
+  ├── Validador llms.txt 🤖
+  └── Detector citas IA multi-plataforma 🔍
+  → SEO tecnico completo + GEO fase 1
+
+Semana 9-10 (Fase 8 - GEO profundo):
+  ├── Auditoria contenido GEO (14 senales) 📋
+  ├── Share of Voice en IA 🏆
+  ├── Dashboard GEO 📊
+  └── Tests GEO 🧪
+  → Plataforma SEO + GEO unificada
+
+Semana 11+ (Fase 4 - Automatizacion avanzada):
+  ├── Extensión navegador 📱
+  ├── Persistencia sesiones 💾
+  └── Suite de tests 🧪 ← ✅ Completado
+  → Producto maduro, profesional y diferencial en el mercado
 
 ---
 

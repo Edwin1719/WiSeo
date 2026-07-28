@@ -412,3 +412,278 @@ class TestExtractSEOStats:
 
         _extract_seo_stats()
         assert "example.com" in st.session_state.seo_stats["domains"]
+
+
+# ============================================================
+# ToolExecutor — _validate_llms_txt
+# ============================================================
+
+class TestValidateLlmstxt:
+    """Validacion de llms.txt para AI crawlers."""
+
+    @pytest.mark.asyncio
+    async def test_llms_txt_ok(self, mock_wigolo, mock_openseo):
+        """llms.txt valido con secciones y URLs."""
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client_cls.return_value = mock_client
+
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.text = (
+                "## Docs\n"
+                "- [Guia SEO](https://example.com/guia-seo)\n"
+                "- [API Ref](https://example.com/api)\n\n"
+                "## Blog\n"
+                "- [SEO 2026](https://example.com/blog/seo-2026)\n"
+            )
+            mock_client.get.return_value = resp
+
+            executor = ToolExecutor(mock_wigolo, mock_openseo)
+            result = await executor.execute(
+                "geo_llms_txt",
+                '{"url": "https://example.com"}',
+                "call_1",
+            )
+            parsed = json.loads(result.content)
+            assert parsed["exists"] is True
+            assert parsed["urls_found"] == 3
+            assert "Docs" in parsed["sections"]
+            assert "Blog" in parsed["sections"]
+
+    @pytest.mark.asyncio
+    async def test_llms_txt_404(self, mock_wigolo, mock_openseo):
+        """Dominio sin llms.txt → warning."""
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client_cls.return_value = mock_client
+
+            resp = MagicMock()
+            resp.status_code = 404
+            mock_client.get.return_value = resp
+
+            executor = ToolExecutor(mock_wigolo, mock_openseo)
+            result = await executor.execute(
+                "geo_llms_txt",
+                '{"url": "https://example.com"}',
+                "call_1",
+            )
+            parsed = json.loads(result.content)
+            assert parsed["exists"] is False
+            assert any("404" in i["msg"] for i in parsed["issues"])
+
+    @pytest.mark.asyncio
+    async def test_llms_txt_no_sections(self, mock_wigolo, mock_openseo):
+        """llms.txt existe pero sin estructura → suggestions."""
+        with patch("httpx.AsyncClient") as mock_client_cls:
+            mock_client = AsyncMock()
+            mock_client.__aenter__.return_value = mock_client
+            mock_client_cls.return_value = mock_client
+
+            resp = MagicMock()
+            resp.status_code = 200
+            resp.text = "- [Home](https://example.com)\n- [About](https://example.com/about)\n"
+            mock_client.get.return_value = resp
+
+            executor = ToolExecutor(mock_wigolo, mock_openseo)
+            result = await executor.execute(
+                "geo_llms_txt",
+                '{"url": "https://example.com"}',
+                "call_1",
+            )
+            parsed = json.loads(result.content)
+            assert parsed["exists"] is True
+            assert parsed["urls_found"] == 2
+            assert not parsed["sections"]  # sin ## headings
+            assert any("Sin secciones" in i["msg"] for i in parsed["issues"])
+
+
+# ============================================================
+# ToolExecutor — _check_geo_citations
+# ============================================================
+
+class TestCheckGeoCitations:
+    """Deteccion de citas de marca en plataformas de IA."""
+
+    @pytest.mark.asyncio
+    async def test_all_platforms_cited(self, mock_wigolo, mock_openseo):
+        """Marca aparece en todas las plataformas → score 100."""
+        mock_wigolo.search = AsyncMock(return_value="Databiq es una plataforma lider en BI...")
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_citation_check",
+            '{"brand": "Databiq"}',
+            "call_1",
+        )
+        parsed = json.loads(result.content)
+        assert parsed["citation_score"] == 100
+        assert parsed["platforms_cited"] == 6
+        assert parsed["platforms_total"] == 6
+
+    @pytest.mark.asyncio
+    async def test_no_platforms_cited(self, mock_wigolo, mock_openseo):
+        """Marca desconocida → score 0."""
+        mock_wigolo.search = AsyncMock(return_value="Sin resultados relevantes.")
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_citation_check",
+            '{"brand": "XyzMarcaInventada123"}',
+            "call_1",
+        )
+        parsed = json.loads(result.content)
+        assert parsed["citation_score"] == 0
+        assert parsed["platforms_cited"] == 0
+
+    @pytest.mark.asyncio
+    async def test_search_error_graceful(self, mock_wigolo, mock_openseo):
+        """Fallo en busqueda → cited=False, no interrumpe el resto."""
+        mock_wigolo.search = AsyncMock(side_effect=Exception("Timeout"))
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_citation_check",
+            '{"brand": "Databiq"}',
+            "call_1",
+        )
+        parsed = json.loads(result.content)
+        assert parsed["citation_score"] == 0
+        assert parsed["platforms_cited"] == 0
+        assert parsed["platforms_total"] == 6  # no se rompe
+
+
+# ============================================================
+# ToolExecutor — _audit_geo_content
+# ============================================================
+
+class TestAuditGeoContent:
+    """Auditoria GEO de contenido contra 5 senales."""
+
+    @pytest.mark.asyncio
+    async def test_excellent_content(self, mock_wigolo, mock_openseo):
+        """Contenido optimizado → score alto."""
+        mock_wigolo.fetch = AsyncMock(return_value=(
+            "# Business Intelligence para Empresas\n\n"
+            "En 2024, el 67% de empresas adoptaron BI segun "
+            "[estudio de Gartner](https://doi.org/10.1234/bi2024). "
+            "La tasa crecio un 23.5% respecto al 2023. "
+            "Segun [Wikipedia](https://en.wikipedia.org/wiki/BI), "
+            "el mercado alcanzara $40 mil millones en 2025.\n\n"
+            "## Beneficios\n\n"
+            "### Reduccion de costos\n\n"
+            "Las empresas reportan ahorros del 30%.\n\n"
+            "### Toma de decisiones\n\n"
+            "Decisiones basadas en datos.\n\n"
+            "## Casos de exito\n\n"
+            "[Netflix](https://netflix.com) y [Amazon](https://amazon.com) usan BI."
+        ))
+        mock_wigolo.extract = AsyncMock(return_value=(
+            '{"schema.org": "Article", "ld+json": true,'
+            '"og:title": "BI para Empresas"}'
+        ))
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_content_audit", '{"url": "https://example.com/articulo"}', "call_1"
+        )
+        parsed = json.loads(result.content)
+        assert parsed["geo_score"] >= 75
+        assert parsed["signals"]["structured_data"] == 25
+        assert parsed["signals"]["stats_and_sources"] == 25
+        assert len(parsed["recommendations"]) <= 2
+
+    @pytest.mark.asyncio
+    async def test_thin_content(self, mock_wigolo, mock_openseo):
+        """Contenido pobre → score bajo + recomendaciones."""
+        mock_wigolo.fetch = AsyncMock(return_value=(
+            "# Bienvenidos\n\nSomos una empresa de datos.\n\n"
+            "## Servicios\n\nOfrecemos analisis y consultoria.\n\n"
+            "Contactanos para mas informacion."
+        ))
+        mock_wigolo.extract = AsyncMock(return_value="{}")
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_content_audit", '{"url": "https://example.com/pobre"}', "call_1"
+        )
+        parsed = json.loads(result.content)
+        assert parsed["geo_score"] <= 30
+        assert parsed["signals"]["structured_data"] == 0
+        assert len(parsed["recommendations"]) >= 2
+
+    @pytest.mark.asyncio
+    async def test_fetch_error_graceful(self, mock_wigolo, mock_openseo):
+        """Fallo en fetch → score 0 sin romper."""
+        mock_wigolo.fetch = AsyncMock(side_effect=Exception("Timeout"))
+        mock_wigolo.extract = AsyncMock(side_effect=Exception("Timeout"))
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_content_audit", '{"url": "https://example.com"}', "call_1"
+        )
+        parsed = json.loads(result.content)
+        assert parsed["geo_score"] == 0
+        assert len(parsed["recommendations"]) >= 1
+
+
+# ============================================================
+# ToolExecutor — _check_geo_share_of_voice
+# ============================================================
+
+class TestGeoShareOfVoice:
+    """Share of Voice competitivo en plataformas de IA."""
+
+    @pytest.mark.asyncio
+    async def test_brand_leads(self, mock_wigolo, mock_openseo):
+        """Marca lidera sobre competidores."""
+        mock_wigolo.search = AsyncMock(side_effect=lambda q, **kw: (
+            "Databiq es lider en BI..." if "Databiq" in q else "Sin resultados"
+        ))
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_share_of_voice",
+            '{"brand": "Databiq", "competitors": ["IBM", "AWS"]}',
+            "call_1",
+        )
+        parsed = json.loads(result.content)
+        assert parsed["leader"] == "Databiq"
+        assert parsed["share_of_voice"]["Databiq"] == 100
+        assert parsed["share_of_voice"]["IBM"] == 0
+
+    @pytest.mark.asyncio
+    async def test_competitor_dominates(self, mock_wigolo, mock_openseo):
+        """Competidor externo lidera, marca atras."""
+        def search_side_effect(query, max_results=5):
+            if "Databiq" in query:
+                return "Sin resultados"
+            return "Google Cloud plataforma lider de BI y analitica de datos"
+
+        mock_wigolo.search = AsyncMock(side_effect=search_side_effect)
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_share_of_voice",
+            '{"brand": "Databiq", "competitors": ["Google Cloud"]}',
+            "call_1",
+        )
+        parsed = json.loads(result.content)
+        assert parsed["leader"] == "Google Cloud"
+        assert parsed["share_of_voice"]["Databiq"] == 0
+
+    @pytest.mark.asyncio
+    async def test_all_zero(self, mock_wigolo, mock_openseo):
+        """Ninguna marca es citada → todos 0%."""
+        mock_wigolo.search = AsyncMock(return_value="Sin resultados relevantes")
+
+        executor = ToolExecutor(mock_wigolo, mock_openseo)
+        result = await executor.execute(
+            "geo_share_of_voice",
+            '{"brand": "Xyz", "competitors": ["Abc", "Def"]}',
+            "call_1",
+        )
+        parsed = json.loads(result.content)
+        for b in ["Xyz", "Abc", "Def"]:
+            assert parsed["share_of_voice"][b] == 0

@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 from collections.abc import AsyncIterator
+import re
 from dataclasses import dataclass, field
 from typing import Any
 from urllib.parse import urlparse
@@ -365,6 +366,78 @@ ALL_TOOLS: list[dict[str, Any]] = WIGOLO_TOOLS + OPENSEO_TOOLS + PAGESPEED_TOOLS
             },
         },
     },
+    {
+        "type": "function",
+        "function": {
+            "name": "geo_llms_txt",
+            "description": "Valida llms.txt de un sitio web: el archivo Markdown que guia a crawlers de IA (ChatGPT, Perplexity, Gemini, Claude) sobre que contenido indexar. Es como robots.txt pero para inteligencia artificial.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL raiz del sitio a validar (ej. https://databiq.com). Se verificara /llms.txt.",
+                    },
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "geo_citation_check",
+            "description": "Detecta si una marca o empresa es citada en 6 plataformas de IA: Google AI Overviews, ChatGPT Search, Perplexity, Gemini, Copilot (Bing) y DeepSeek. Calcula un Citation Score (0-100%) indicando en cuantas plataformas aparece la marca.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "brand": {
+                        "type": "string",
+                        "description": "Marca o empresa a verificar (ej. 'Databiq', 'Nike').",
+                    },
+                    "keywords": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Keywords opcionales para refinar la busqueda (ej. ['business intelligence', 'analitica de datos']).",
+                    },
+                },
+                "required": ["brand"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "geo_content_audit",
+            "description": "Audita una URL contra 5 senales GEO esenciales que determinan si el contenido sera citado por IA. Evalua: structured data (JSON-LD), estadisticas con fuentes autoritativas, estructura de headings, frescura del contenido y profundidad. Retorna un GEO Score de 0-100 con recomendaciones priorizadas.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "url": {
+                        "type": "string",
+                        "description": "URL de la pagina a auditar (ej. https://databiq.com).",
+                    },
+                },
+                "required": ["url"],
+            },
+        },
+    },
+    {
+        "type": "function",
+        "function": {
+            "name": "geo_share_of_voice",
+            "description": "Compara la visibilidad de una marca vs sus competidores en 6 plataformas de IA (Google AI Overviews, ChatGPT, Perplexity, Gemini, Copilot, DeepSeek). Calcula Share of Voice, identifica al lider y detecta gaps competitivos.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "brand": {"type": "string", "description": "Marca principal a evaluar (ej. 'Databiq')."},
+                    "competitors": {"type": "array", "items": {"type": "string"}, "description": "Competidores a comparar (ej. ['Google Cloud', 'IBM', 'AWS'])."},
+                    "keywords": {"type": "array", "items": {"type": "string"}, "description": "Keywords para refinar busqueda (ej. ['business intelligence'])."},
+                },
+                "required": ["brand", "competitors"],
+            },
+        },
+    },
 ]
 
 
@@ -406,6 +479,10 @@ class ToolExecutor:
             "pagespeed_analyze": self._pagespeed_analyze,
             "seo_validate_sitemaps": self._validate_sitemaps,
             "seo_ai_overview": self._check_ai_overview,
+            "geo_llms_txt": self._validate_llms_txt,
+            "geo_citation_check": self._check_geo_citations,
+            "geo_content_audit": self._audit_geo_content,
+            "geo_share_of_voice": self._check_geo_share_of_voice,
         }
 
     async def _pagespeed_analyze(self, url: str, strategy: str = "mobile") -> dict:
@@ -554,6 +631,195 @@ class ToolExecutor:
             )
 
         return result
+
+    async def _validate_llms_txt(self, url: str) -> dict:
+        """Valida llms.txt de un sitio web para AI crawlers (llmstxt.org)."""
+        parsed = urlparse(url)
+        root = f"{parsed.scheme}://{parsed.netloc}"
+        result = {"url": root, "exists": False, "sections": [], "issues": []}
+
+        async with httpx.AsyncClient(timeout=15, follow_redirects=True) as client:
+            try:
+                resp = await client.get(f"{root}/llms.txt")
+            except Exception as exc:
+                result["issues"].append({"type": "error", "msg": f"Error al obtener llms.txt: {exc}"})
+                return result
+
+            if resp.status_code == 404:
+                result["issues"].append({
+                    "type": "warning",
+                    "msg": "llms.txt no encontrado (HTTP 404). Los crawlers de IA no tienen guia de indexacion.",
+                })
+                return result
+
+            if resp.status_code != 200:
+                result["issues"].append({
+                    "type": "error",
+                    "msg": f"llms.txt respondio HTTP {resp.status_code}",
+                })
+                return result
+
+            result["exists"] = True
+            content = resp.text
+
+            sections = re.findall(r"^##\s+(.+)$", content, re.MULTILINE)
+            urls = re.findall(r"^\s*-\s*\[([^\]]+)\]\(([^)]+)\)", content, re.MULTILINE)
+
+            result["sections"] = sections
+            result["urls_found"] = len(urls)
+
+            if not sections:
+                result["issues"].append({
+                    "type": "warning",
+                    "msg": "Sin secciones (##). Agrega secciones como '## Docs' o '## API'.",
+                })
+            if not urls:
+                result["issues"].append({
+                    "type": "warning",
+                    "msg": "Sin enlaces Markdown. Agrega: - [Titulo](url).",
+                })
+
+            # Sugerencias: secciones comunes que podrian faltar
+            has = lambda kw: any(kw in s.lower() for s in sections)
+            for label, kw in [("Docs", "doc"), ("Blog", "blog"), ("API", "api"), ("FAQ", "faq")]:
+                if not has(kw):
+                    result["issues"].append({
+                        "type": "suggestion",
+                        "msg": f"Considera agregar seccion '## {label}'.",
+                    })
+
+        return result
+
+    async def _check_geo_citations(self, brand: str, keywords: list[str] | None = None) -> dict:
+        """Detecta si una marca es citada en 6 plataformas de IA."""
+        suffix = f" {keywords[0]}" if keywords else ""
+
+        platforms: dict[str, str] = {
+            "google_ai_overview":  f'"{brand}" ai overview{suffix}',
+            "chatgpt_search":      f'"{brand}" chatgpt{suffix}',
+            "perplexity":          f'"{brand}" perplexity{suffix}',
+            "gemini":              f'"{brand}" gemini ai{suffix}',
+            "copilot_bing":        f'"{brand}" copilot microsoft{suffix}',
+            "deepseek":            f'"{brand}" deepseek{suffix}',
+        }
+
+        results: dict[str, dict[str, bool]] = {}
+        for name, query in platforms.items():
+            try:
+                search = await self._wigolo.search(query, max_results=5)
+                results[name] = {"cited": brand.lower() in str(search).lower()}
+            except Exception:
+                results[name] = {"cited": False}
+
+        cited = sum(1 for r in results.values() if r["cited"])
+        return {
+            "brand": brand,
+            "platforms": results,
+            "citation_score": round(cited / len(platforms) * 100),
+            "platforms_cited": cited,
+            "platforms_total": len(platforms),
+        }
+
+    async def _audit_geo_content(self, url: str) -> dict:
+        """Audita una URL contra 5 senales GEO esenciales. Score 0-100."""
+        try:
+            md = str(await self._wigolo.fetch(url, format="markdown"))
+        except Exception:
+            md = ""
+        try:
+            ex = str(await self._wigolo.extract(url))
+        except Exception:
+            ex = ""
+
+        words = len(re.findall(r"\b\w+\b", md))
+        headings = re.findall(r"^(#{1,6})\s+(.+)$", md, re.MULTILINE)
+        h1s = [h for lvl, h in headings if lvl == "#"]
+        links = re.findall(r"\[([^\]]+)\]\(([^)]+)\)", md)
+        stats = re.findall(r"\b\d+[.,]?\d*\s*%|\b\d+\.\d+\b", md)
+        has_schema = "ld+json" in ex.lower() or "schema.org" in ex.lower()
+        has_dates = bool(re.findall(r"\b(20[12]\d)\b", md))
+
+        authoritative = sum(
+            1 for _, u in links
+            if any(d in u for d in (".edu", ".gov", "wikipedia.org", "doi.org", "arxiv.org", "scholar.google"))
+        )
+
+        signals = {
+            "structured_data":  25 if has_schema else 0,
+            "stats_and_sources": 25 if len(stats) >= 2 and authoritative >= 1
+                                   else 15 if len(stats) >= 1 or authoritative >= 1
+                                   else 0,
+            "heading_structure": 20 if len(h1s) == 1 and len(headings) >= 3
+                                   else 10 if h1s and headings
+                                   else 0,
+            "freshness":         15 if has_dates else 0,
+            "depth":             15 if words >= 1500 else 8 if words >= 500 else 0,
+        }
+        score = sum(signals.values())
+
+        recs = []
+        if not has_schema:
+            recs.append("Agrega JSON-LD structured data (schema.org/Article o Organization)")
+        if signals["stats_and_sources"] < 25:
+            recs.append("Incluye estadisticas con fuentes autoritativas (.edu, .gov, estudios)")
+        if signals["heading_structure"] < 20:
+            recs.append("Usa un H1 unico y jerarquia H2-H3 clara")
+        if not has_dates:
+            recs.append("Agrega fecha de publicacion o 'Actualizado el...'")
+        if words < 500:
+            recs.append(f"Contenido muy corto ({words} palabras). Minimo 500, ideal 1500+")
+
+        return {
+            "url": url, "geo_score": score, "signals": signals,
+            "details": {"words": words, "h1_count": len(h1s), "headings_total": len(headings),
+                        "stats_found": len(stats), "authoritative_sources": authoritative},
+            "recommendations": recs,
+        }
+
+    async def _check_geo_share_of_voice(
+        self, brand: str, competitors: list[str], keywords: list[str] | None = None
+    ) -> dict:
+        """Share of Voice: visibilidad de marca vs competidores en 6 plataformas de IA."""
+        suffix = f" {keywords[0]}" if keywords else ""
+        all_brands = [brand] + competitors
+
+        platforms: dict[str, str] = {
+            "google_ai_overview": '"{brand}" ai overview{suffix}',
+            "chatgpt_search":     '"{brand}" chatgpt{suffix}',
+            "perplexity":         '"{brand}" perplexity{suffix}',
+            "gemini":             '"{brand}" gemini ai{suffix}',
+            "copilot_bing":       '"{brand}" copilot microsoft{suffix}',
+            "deepseek":           '"{brand}" deepseek{suffix}',
+        }
+
+        results: dict[str, dict] = {}
+        for b in all_brands:
+            brand_results: dict[str, bool] = {}
+            for name, query_tpl in platforms.items():
+                query = query_tpl.format(brand=b, suffix=suffix)
+                try:
+                    search = await self._wigolo.search(query, max_results=5)
+                    brand_results[name] = b.lower() in str(search).lower()
+                except Exception:
+                    brand_results[name] = False
+
+            cited = sum(1 for v in brand_results.values() if v)
+            results[b] = {
+                "citation_score": round(cited / len(platforms) * 100),
+                "platforms_cited": cited,
+                "platforms_total": len(platforms),
+                "platforms": {p: {"cited": v} for p, v in brand_results.items()},
+            }
+
+        ranked = sorted(results.items(), key=lambda x: x[1]["citation_score"], reverse=True)
+        return {
+            "brand": brand,
+            "keywords": keywords,
+            "share_of_voice": {b: r["citation_score"] for b, r in results.items()},
+            "leader": ranked[0][0],
+            "details": {b: f"{r['citation_score']}% ({r['platforms_cited']}/{r['platforms_total']})"
+                        for b, r in results.items()},
+        }
 
     async def execute(
         self, tool_name: str, arguments: str, tool_call_id: str

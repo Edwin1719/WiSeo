@@ -31,7 +31,7 @@ from src.mcp.clients import (
     openseo_session,
     wigolo_session,
 )
-from src.ui.components import tool_call_status
+from src.ui.components import tool_call_status, export_to_excel
 
 logging.basicConfig(level=logging.INFO)
 # Silencia logs ruidosos del SDK MCP durante limpieza
@@ -541,6 +541,16 @@ def _render_chat() -> None:
         except Exception as exc:
             response = f"❌ Error: {exc}"
             logger.exception("Agent error")
+
+        # ── Boton de exportacion a Excel ──
+        if response and not response.startswith("❌"):
+            xlsx = export_to_excel(response, prompt)
+            st.download_button(
+                "📥 Descargar analisis (Excel)",
+                xlsx,
+                file_name=f"seo_{datetime.now():%Y%m%d_%H%M}.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            )
 
     st.session_state.messages.append({"role": "assistant", "content": response})
     _extract_seo_stats()

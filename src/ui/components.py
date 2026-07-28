@@ -358,3 +358,24 @@ def pagespeed_card(data: dict) -> None:
         )
 
     st.markdown("</div></div>", unsafe_allow_html=True)
+
+
+# ============================================================
+# Excel Export
+# ============================================================
+
+def export_to_excel(response: str, query: str = "") -> bytes:
+    """Envuelve el analisis del agente en un Excel con metadata."""
+    import io
+    from datetime import datetime
+
+    import pandas as pd
+
+    buf = io.BytesIO()
+    with pd.ExcelWriter(buf, engine="openpyxl") as writer:
+        pd.DataFrame([{
+            "Fecha": datetime.now().strftime("%Y-%m-%d %H:%M"),
+            "Consulta": query,
+            "Analisis": response,
+        }]).to_excel(writer, sheet_name="Analisis SEO", index=False)
+    return buf.getvalue()

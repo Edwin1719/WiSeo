@@ -2,7 +2,7 @@
 
 **by Edwin Quintero Alzate — DATABiQ**
 
-**Agente virtual de SEO inteligente** — consulta en lenguaje natural y obtén análisis profesionales de cualquier sitio web: estructura on-page, velocidad, Core Web Vitals, sitemaps, competidores y más. Sin depender de Semrush, Ahrefs ni suscripciones costosas.
+**Agente virtual de SEO + GEO inteligente** — consulta en lenguaje natural y obtén análisis profesionales de cualquier sitio web: estructura on-page, velocidad, Core Web Vitals, sitemaps, visibilidad en motores de IA, competidores y más. Sin depender de Semrush, Ahrefs ni suscripciones costosas.
 
 ---
 
@@ -14,7 +14,7 @@ El SEO profesional tradicional requiere:
 - **Trabajo manual** para cruzar información de velocidad, contenido, backlinks y sitemaps
 - **Costos elevados** que empiezan en $100+/mes
 
-**SEO Agent unifica todo en una sola conversación**, con costos de ~$0.27 por cada 1M de tokens de DeepSeek (centavos por análisis completo).
+**SEO Agent unifica todo en una sola conversacion**, con costos de ~$0.27 por cada 1M de tokens de DeepSeek (centavos por analisis completo). **Ahora con GEO** — analiza si tu marca es citada por ChatGPT, Perplexity, Gemini, Google AI Overviews, Copilot y DeepSeek.
 
 ---
 
@@ -61,6 +61,14 @@ DeepSeek V4 (Flash o Pro) orquesta la conversación, decide qué herramientas ne
 - Identifica fuentes citadas en los AI Overviews
 - Recomienda optimización para aparecer en resultados de IA
 
+
+### 🤖 GEO — Generative Engine Optimization *(nuevo)*
+- **Validador llms.txt**: detecta y valida llms.txt para crawlers de IA (ChatGPT, Perplexity, Gemini)
+- **Detector de citas en IA**: verifica si tu marca es citada en 6 plataformas (Google AI Overviews, ChatGPT Search, Perplexity, Gemini, Copilot, DeepSeek)
+- **Auditoria de contenido GEO**: score 0-100 con 5 senales (structured data, estadisticas, headings, frescura, profundidad)
+- **Share of Voice**: ranking competitivo de visibilidad en IA vs competidores
+- **Sin APIs de pago**: todo funciona con Wigolo + DeepSeek, $0 adicional
+
 ### 📊 Dashboard de KPIs
 - Keywords investigadas, dominios analizados, SERPs consultados
 - Tools ejecutadas y análisis PageSpeed realizados
@@ -73,10 +81,10 @@ DeepSeek V4 (Flash o Pro) orquesta la conversación, decide qué herramientas ne
 - Rank tracking histórico
 
 ### 🧪 Suite de Tests
-- **40 tests** — pytest + pytest-asyncio
-- Cobertura del núcleo: config, parsing MCP, dispatch de tools, detección AI Overview, validación sitemaps, estado del agente
+- **52 tests** — pytest + pytest-asyncio
+- Cobertura del nucleo: config, parsing MCP, dispatch de tools, deteccion AI Overview, validacion sitemaps, estado del agente, GEO (llms.txt, citation check, content audit, share of voice)
 - Mocks de servidores MCP y HTTP externos — 0 dependencias de red en los tests
-- Ejecución: `python -m pytest tests/ -v`
+- Ejecucion: `python -m pytest tests/ -v`
 
 ---
 
@@ -156,24 +164,28 @@ docker compose -f ../open-seo/compose.yaml down
 | *"Busca información sobre SEO ecommerce 2026"* | Wigolo search | Resultados web |
 | *"Investigación de mercado BI en Colombia"* | Wigolo research | Reporte con fuentes |
 | *"Investiga keywords para cafetería online"* | OpenSEO | Volumen, dificultad, CPC |
+| *"Valida el llms.txt de anthropic.com"* | geo_llms_txt | Existe, secciones, URLs, sugerencias |
+| *"¿Databiq es citado por ChatGPT y Perplexity?"* | geo_citation_check | Citation Score por plataforma |
+| *"Audita nike.com para GEO"* | geo_content_audit | Score 0-100 + recomendaciones |
+| *"Compara Anthropic vs OpenAI en IA"* | geo_share_of_voice | Ranking, lider, gaps competitivos |
 
 ---
 
 ## 🗺️ Roadmap
-
-| Fase | Feature | Estado |
-|---|---|---|
 | **1.1** | 🚦 PageSpeed Insights | ✅ Completado |
 | **1.2** | 🕸️ Validador de sitemaps | ✅ Completado |
-| **1.3** | 🔍 Auditoría on-page (57 reglas) | 📋 Pendiente |
+| **1.3** | 🔍 Auditoria on-page (57 reglas) | 📋 Pendiente |
 | **2.1** | 🧬 Analizador TF-IDF de contenido | 📋 Pendiente |
-| **4.4** | 🔗 Prospector de link building (find_similar) | ✅ Completado |
+| **4.3** | 📤 Exportacion a Excel | ✅ Completado |
+| **4.4** | 🔗 Prospector de link building | ✅ Completado |
 | **5.1** | 📊 Dashboard de KPIs | ✅ Completado |
 | **5.2** | 💾 Persistencia de sesiones | 📋 Pendiente |
 | **5.4** | 🌍 AI Overviews / SGE | ✅ Completado |
-| **6.1** | 🧪 Suite de tests (40 tests) | ✅ Completado |
-
-Ver [ROADMAP.md](./ROADMAP.md) para el plan completo.
+| **6.1** | 🧪 Suite de tests (52 tests) | ✅ Completado |
+| **8.1** | 🤖 Validador llms.txt | ✅ Completado |
+| **8.2** | 🔍 Detector citas IA (6 plataformas) | ✅ Completado |
+| **8.3** | 📋 Auditoria contenido GEO | ✅ Completado |
+| **8.4** | 🏆 Share of Voice en IA | ✅ Completado |
 
 ---
 
